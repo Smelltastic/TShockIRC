@@ -6,6 +6,7 @@ using IrcDotNet;
 using Terraria;
 using TShockAPI;
 using TShockAPI.DB;
+using TShockAPI.Hooks;
 
 namespace TShockIRC
 {
@@ -28,12 +29,12 @@ namespace TShockIRC
 				if (String.IsNullOrEmpty(ircCommand.Permission) || senderGroup.HasPermission(ircCommand.Permission))
 				{
 					if (ircCommand.DoLog)
-						Log.Info("{0} executed: /{1}.", sender.NickName, str);
+						TShock.Log.Info("{0} executed: /{1}.", sender.NickName, str);
 					ircCommand.Execute(args);
 				}
 				else
 				{
-					Log.Warn("{0} tried to execute /{1}.", sender.NickName, str);
+					TShock.Log.Warn("{0} tried to execute /{1}.", sender.NickName, str);
 					TShockIRC.SendMessage(target, "\u00035You do not have access to this command.");
 				}
 			}
@@ -50,7 +51,7 @@ namespace TShockIRC
 					{
 						if (!command.CanRun(tsIrcPlayer))
 						{
-							Log.Warn("{0} tried to execute /{1}.", sender.NickName, str);
+							TShock.Log.Warn("{0} tried to execute /{1}.", sender.NickName, str);
 							TShockIRC.SendMessage(target, "\u00035You do not have access to this command.");
 						}
 						else if (!command.AllowServer)
@@ -58,10 +59,10 @@ namespace TShockIRC
 						else
 						{
 							var parms = args.ParameterRange(0, args.Length);
-							if (TShockAPI.Hooks.PlayerHooks.OnPlayerCommand(tsIrcPlayer, command.Name, str, parms, ref commands))
+							if (PlayerHooks.OnPlayerCommand(tsIrcPlayer, command.Name, str, parms, ref commands, TShockAPI.Commands.Specifier))
 								return;
 							if (command.DoLog)
-								Log.Info("{0} executed: /{1}.", sender.NickName, str);
+								TShock.Log.Info("{0} executed: /{1}.", sender.NickName, str);
 							command.Run(str, tsIrcPlayer, parms);
 						}
 					}
@@ -71,7 +72,7 @@ namespace TShockIRC
 			}
 			else
 			{
-				Log.Warn("{0} tried to execute /{1}.", sender.NickName, str);
+				TShock.Log.Warn("{0} tried to execute /{1}.", sender.NickName, str);
 				TShockIRC.SendMessage(target, "\u00035You do not have access to this command.");
 			}
 		}

@@ -16,7 +16,7 @@ using Group = TShockAPI.Group;
 
 namespace TShockIRC
 {
-	[ApiVersion(1, 16)]
+	[ApiVersion(1, 17)]
 	public class TShockIRC : TerrariaPlugin
 	{
 		#region TerrariaPlugin implementation
@@ -99,7 +99,7 @@ namespace TShockIRC
 			TSPlayer tsPlr = TShock.Players[e.Who];
 			if (!IrcClient.IsConnected)
 				Connect();
-			else if (e.Text != null && !e.Text.StartsWith(TShock.Config.CommandSpecifier) && tsPlr != null &&
+			else if (e.Text != null && !e.Text.StartsWith(Commands.Specifier) && !e.Text.StartsWith(Commands.SilentSpecifier) && tsPlr != null &&
 				!tsPlr.mute && tsPlr.Group.HasPermission(Permissions.canchat) && !String.IsNullOrEmpty(Config.ServerChatMessageFormat) &&
 				!Config.IgnoredServerChatRegexes.Any(s => Regex.IsMatch(e.Text, s)))
 			{
