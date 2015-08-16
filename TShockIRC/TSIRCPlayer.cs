@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using TShockAPI;
+﻿using TShockAPI;
 using IrcDotNet;
 
 namespace TShockIRC
@@ -18,7 +14,8 @@ namespace TShockIRC
 		{
 			Group = group;
 			Target = target;
-			UserAccountName = name;
+			if (User != null)
+				User.Name = name;
 		}
 
 		public override void SendMessage(string msg, Color color)

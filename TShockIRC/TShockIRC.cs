@@ -6,7 +6,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using IrcDotNet;
 using IrcDotNet.Ctcp;
-using Newtonsoft.Json;
 using Terraria;
 using TerrariaApi.Server;
 using TShockAPI;
@@ -16,13 +15,13 @@ using Group = TShockAPI.Group;
 
 namespace TShockIRC
 {
-	[ApiVersion(1, 17)]
+	[ApiVersion(1, 21)]
 	public class TShockIRC : TerrariaPlugin
 	{
 		#region TerrariaPlugin implementation
 		public override string Author
 		{
-			get { return "MarioE"; }
+			get { return "Nyx Studios"; }
 		}
 		public override string Description
 		{
@@ -288,7 +287,7 @@ namespace TShockIRC
 				}
 
 				string text = e.Text;
-				text = System.Text.RegularExpressions.Regex.Replace(text, "\u0003[0-9]{1,2}(,[0-9]{1,2})?", "");
+				text = Regex.Replace(text, "\u0003[0-9]{1,2}(,[0-9]{1,2})?", "");
 				text = text.Replace("\u0002", "");
 				text = text.Replace("\u000f", "");
 				text = text.Replace("\u001d", "");
