@@ -14,8 +14,6 @@ namespace TShockIRC
 		{
 			Group = group;
 			Target = target;
-			if (User != null)
-				User.Name = name;
 		}
 
 		public override void SendMessage(string msg, Color color)

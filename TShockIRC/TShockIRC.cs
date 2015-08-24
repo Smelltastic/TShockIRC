@@ -9,6 +9,7 @@ using IrcDotNet.Ctcp;
 using Terraria;
 using TerrariaApi.Server;
 using TShockAPI;
+using TShockAPI.DB;
 using TShockAPI.Hooks;
 
 using Group = TShockAPI.Group;
@@ -40,7 +41,7 @@ namespace TShockIRC
 		public static Config Config = new Config();
 		public static CtcpClient CtcpClient;
 		public static IrcClient IrcClient = new IrcClient();
-		public static Dictionary<IrcUser, Group> IrcUsers = new Dictionary<IrcUser, Group>();
+		public static Dictionary<IrcUser, User> IrcUsers = new Dictionary<IrcUser, User>();
 
 		public TShockIRC(Main game)
 			: base(game)
@@ -235,7 +236,7 @@ namespace TShockIRC
 			if (String.Equals(e.ChannelUser.Channel.Name, Config.Channel, StringComparison.OrdinalIgnoreCase))
 			{
 				if (!IrcUsers.ContainsKey(e.ChannelUser.User))
-					IrcUsers.Add(e.ChannelUser.User, TShock.Groups.GetGroupByName(TShock.Config.DefaultGuestGroupName));
+					IrcUsers.Add(e.ChannelUser.User, null);
 				e.ChannelUser.User.Quit += OnUserQuit;
 
 				if (!String.IsNullOrEmpty(Config.IRCJoinMessageFormat))
@@ -302,7 +303,10 @@ namespace TShockIRC
 				{
 					if (!String.IsNullOrEmpty(Config.IRCChatMessageFormat))
 					{
-						Group group = IrcUsers[ircUser];
+						User user = IrcUsers[ircUser];
+						Group group = user == null
+							? TShock.Groups.GetGroupByName(TShock.Config.DefaultGuestGroupName)
+							: TShock.Groups.GetGroupByName(user.Group);
 						TShock.Utils.Broadcast(String.Format(Config.IRCChatMessageFormat, group.Prefix, e.Source.Name, text), group.R, group.G, group.B);
 					}
 				}
@@ -316,7 +320,7 @@ namespace TShockIRC
 				foreach (IrcChannelUser ircChannelUser in ircChannel.Users.Where(icu => !Config.IgnoredIRCNicks.Contains(icu.User.NickName)))
 				{
 					if (!IrcUsers.ContainsKey(ircChannelUser.User))
-						IrcUsers.Add(ircChannelUser.User, TShock.Groups.GetGroupByName(TShock.Config.DefaultGuestGroupName));
+						IrcUsers.Add(ircChannelUser.User, null);
 					ircChannelUser.User.Quit += OnUserQuit;
 				}
 			}

@@ -23,7 +23,10 @@ namespace TShockIRC
 				return;
 
 			var ircCommand = Commands.Find(c => c.Names.Contains(commandName));
-			var senderGroup = TShockIRC.IrcUsers[sender];
+			User user = TShockIRC.IrcUsers[sender];
+			Group senderGroup = user == null
+				? TShock.Groups.GetGroupByName(TShock.Config.DefaultGuestGroupName)
+				: TShock.Groups.GetGroupByName(user.Group);
 			if (ircCommand != null)
 			{
 				if (String.IsNullOrEmpty(ircCommand.Permission) || senderGroup.HasPermission(ircCommand.Permission))
@@ -138,8 +141,8 @@ namespace TShockIRC
 			{
 				if (user.VerifyPassword(e[1]))
 				{
-					TShockIRC.SendMessage(e.Target, "\u00033You have logged in as " + e[0] + ".");
-					TShockIRC.IrcUsers[e.Sender] = TShock.Utils.GetGroup(user.Group);
+					TShockIRC.SendMessage(e.Target, "\u00033You have logged in as " + user.Name + ".");
+					TShockIRC.IrcUsers[e.Sender] = user;
 				}
 				else
 					TShockIRC.SendMessage(e.Target, "\u00035Incorrect password!");
@@ -147,7 +150,7 @@ namespace TShockIRC
 		}
 		static void Logout(object sender, IRCCommandEventArgs e)
 		{
-			TShockIRC.IrcUsers[e.Sender] = TShock.Groups.GetGroupByName(TShock.Config.DefaultGuestGroupName);
+			TShockIRC.IrcUsers[e.Sender] = null;
 			TShockIRC.SendMessage(e.Target, "\u00033You have logged out.");
 		}
 		static void Players(object sender, IRCCommandEventArgs e)
