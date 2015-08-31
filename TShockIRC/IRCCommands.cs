@@ -43,7 +43,7 @@ namespace TShockIRC
 			}
 			else if (senderGroup.HasPermission("tshockirc.command"))
 			{
-				var tsIrcPlayer = new TSIrcPlayer(sender.NickName, senderGroup, target);
+				var tsIrcPlayer = new TSIrcPlayer(sender.NickName, user, target);
 				var commands = TShockAPI.Commands.ChatCommands.Where(c => c.HasAlias(commandName));
 
 				if (commands.Count() != 0)

@@ -1,4 +1,5 @@
 ﻿using TShockAPI;
+using TShockAPI.DB;
 using IrcDotNet;
 
 namespace TShockIRC
@@ -13,6 +14,14 @@ namespace TShockIRC
 			: base(name)
 		{
 			Group = group;
+			Target = target;
+		}
+
+		public TSIrcPlayer(string name, User user, IIrcMessageTarget target)
+			: base(name)
+		{
+			User = user;
+			Group = TShock.Groups.GetGroupByName(user.Group);
 			Target = target;
 		}
 

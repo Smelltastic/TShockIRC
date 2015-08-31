@@ -166,7 +166,7 @@ namespace TShockIRC
 			if (!IrcClient.IsConnected)
 				Connect();
 			else if (!String.IsNullOrEmpty(Config.ServerLoginAdminMessageFormat))
-				SendMessage(Config.AdminChannel, String.Format(Config.ServerLoginAdminMessageFormat, e.Player.Name, e.Player.UserAccountName, e.Player.IP));
+				SendMessage(Config.AdminChannel, String.Format(Config.ServerLoginAdminMessageFormat, e.Player.Name, e.Player.User.Name, e.Player.IP));
 		}
 
 		#region Commands
