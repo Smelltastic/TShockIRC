@@ -15,7 +15,7 @@ using Group = TShockAPI.Group;
 
 namespace TShockIRC
 {
-	[ApiVersion(1, 21)]
+	[ApiVersion(1, 23)]
 	public class TShockIRC : TerrariaPlugin
 	{
 		#region TerrariaPlugin implementation
@@ -74,6 +74,7 @@ namespace TShockIRC
 			if (disposing)
 			{
 				ServerApi.Hooks.GameInitialize.Deregister(this, OnInitialize);
+				ServerApi.Hooks.GamePostInitialize.Deregister(this, OnPostInitialize);
 				ServerApi.Hooks.NetGreetPlayer.Deregister(this, OnGreetPlayer);
 				ServerApi.Hooks.ServerChat.Deregister(this, OnChat);
 				ServerApi.Hooks.ServerLeave.Deregister(this, OnLeave);
@@ -86,6 +87,7 @@ namespace TShockIRC
 		public override void Initialize()
 		{
 			ServerApi.Hooks.GameInitialize.Register(this, OnInitialize);
+			ServerApi.Hooks.GamePostInitialize.Register(this, OnPostInitialize);
 			ServerApi.Hooks.NetGreetPlayer.Register(this, OnGreetPlayer);
 			ServerApi.Hooks.ServerChat.Register(this, OnChat);
 			ServerApi.Hooks.ServerLeave.Register(this, OnLeave);
@@ -126,7 +128,9 @@ namespace TShockIRC
 
 			string configPath = Path.Combine(TShock.SavePath, "tshockircconfig.json");
 			(Config = Config.Read(configPath)).Write(configPath);
-
+		}
+		void OnPostInitialize(EventArgs e)
+		{
 			Connect();
 		}
 		void OnLeave(LeaveEventArgs e)
@@ -165,7 +169,7 @@ namespace TShockIRC
 			if (!IrcClient.IsConnected)
 				Connect();
 			else if (!String.IsNullOrEmpty(Config.ServerLoginAdminMessageFormat))
-				SendMessage(Config.AdminChannel, String.Format(Config.ServerLoginAdminMessageFormat, e.Player.Name, e.Player.UserAccountName, e.Player.IP));
+				SendMessage(Config.AdminChannel, String.Format(Config.ServerLoginAdminMessageFormat, e.Player.Name, e.Player.User.Name, e.Player.IP));
 		}
 
 		#region Commands
