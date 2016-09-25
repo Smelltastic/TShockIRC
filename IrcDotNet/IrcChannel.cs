@@ -189,7 +189,12 @@ namespace IrcDotNet
             if (user == null)
                 throw new ArgumentNullException("user");
 
-            return this.users.SingleOrDefault(cu => cu.User == user);
+            // No longer raises an exception if there is more than one item in this.users.
+            // This appears to happen in ZNC if you connect from multiple places.
+            // A tentative change as I'm not sure why it was set up that way to start.
+            //return this.users.SingleOrDefault(cu => cu.User == user);
+            return this.users.FirstOrDefault(cu => cu.User == user);
+
         }
 
         /// <inheritdoc cref="Invite(string)"/>

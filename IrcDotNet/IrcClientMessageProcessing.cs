@@ -292,9 +292,12 @@ namespace IrcDotNet
             this.WelcomeMessage = message.Parameters[1];
 
             // Extract nick name, user name, and host name from welcome message. Use fallback info if not present.
+
+            // Disabling due to twitch's bizarre welcome message. We should know our nick already anyhow.
+            // Ignoring it should probably be a config option instead though.
             var nickNameIdMatch = Regex.Match(this.WelcomeMessage.Split(' ').Last(), regexNickNameId);
-            this.localUser.NickName = nickNameIdMatch.Groups["nick"].GetValue() ?? this.localUser.NickName;
-            this.localUser.UserName = nickNameIdMatch.Groups["user"].GetValue() ?? this.localUser.UserName;
+            //this.localUser.NickName = nickNameIdMatch.Groups["nick"].GetValue() ?? this.localUser.NickName;
+            //this.localUser.UserName = nickNameIdMatch.Groups["user"].GetValue() ?? this.localUser.UserName;
             this.localUser.HostName = nickNameIdMatch.Groups["host"].GetValue() ?? this.localUser.HostName;
 
             this.isRegistered = true;
@@ -336,14 +339,33 @@ namespace IrcDotNet
         {
             Debug.Assert(message.Parameters[0] == this.localUser.NickName);
 
-            Debug.Assert(message.Parameters[1] != null);
-            this.ServerName = message.Parameters[1];
-            Debug.Assert(message.Parameters[2] != null);
-            this.ServerVersion = message.Parameters[2];
-            Debug.Assert(message.Parameters[3] != null);
-            this.ServerAvailableUserModes = message.Parameters[3];
-            Debug.Assert(message.Parameters[4] != null);
-            this.ServerAvailableChannelModes = message.Parameters[4];
+            if (message.Parameters[1] != null)
+            {
+                if( System.Text.RegularExpressions.Regex.IsMatch(message.Parameters[1],"\\w+\\.\\w+\\.\\w+"))
+                {
+                    this.ServerName = message.Parameters[1];
+                } else
+                {
+                    this.ServerName = message.Source.Name;
+                }
+            }
+
+            //~ Debug.Assert(message.Parameters[1] != null);
+            //~ this.ServerName = message.Parameters[1];
+            //~ Debug.Assert(message.Parameters[2] != null);
+            if( message.Parameters[2] != null )
+            {
+                this.ServerVersion = message.Parameters[2];
+            }
+            //~ Debug.Assert(message.Parameters[3] != null);
+            if( message.Parameters[3] != null ) {
+                this.ServerAvailableUserModes = message.Parameters[3];
+            }
+            //~Debug.Assert(message.Parameters[4] != null);
+            if( message.Parameters[4] != null )
+            {
+                this.ServerAvailableChannelModes = message.Parameters[4];
+            }
 
             // All initial information about client has now been received.
             OnClientInfoReceived(new EventArgs());

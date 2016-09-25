@@ -57,12 +57,14 @@ namespace TShockIRC
 			Connecting = true;
 			IrcUsers.Clear();
 			IrcClient = new IrcClient();
-			IrcClient.Connect(Config.Server, Config.Port, Config.SSL,
+            IrcClient.Connect(Config.Server, Config.Port, Config.SSL,
 				new IrcUserRegistrationInfo()
 				{
 					NickName = Config.Nick,
 					RealName = Config.RealName,
 					UserName = Config.UserName,
+                    // Add password to config
+                    Password = Config.Password,
 					UserModes = new List<char> { 'i', 'w' }
 				});
 			IrcClient.Disconnected += OnIRCDisconnected;
@@ -78,7 +80,8 @@ namespace TShockIRC
 				ServerApi.Hooks.NetGreetPlayer.Deregister(this, OnGreetPlayer);
 				ServerApi.Hooks.ServerChat.Deregister(this, OnChat);
 				ServerApi.Hooks.ServerLeave.Deregister(this, OnLeave);
-				PlayerHooks.PlayerCommand -= OnPlayerCommand;
+                //ServerApi.Hooks.ServerBroadcast.Deregister(this, OnBroadcast);
+                PlayerHooks.PlayerCommand -= OnPlayerCommand;
 				PlayerHooks.PlayerPostLogin -= OnPostLogin;
 
 				IrcClient.Dispose();
@@ -91,11 +94,28 @@ namespace TShockIRC
 			ServerApi.Hooks.NetGreetPlayer.Register(this, OnGreetPlayer);
 			ServerApi.Hooks.ServerChat.Register(this, OnChat);
 			ServerApi.Hooks.ServerLeave.Register(this, OnLeave);
+            //ServerApi.Hooks.ServerBroadcast.Register(this, OnBroadcast);
 			PlayerHooks.PlayerCommand += OnPlayerCommand;
 			PlayerHooks.PlayerPostLogin += OnPostLogin;
 		}
 
-		void OnChat(ServerChatEventArgs e)
+        // An attempt to handle server broadcasts, except it actually just picks up player chats
+        // and not server broadcasts at all. Possibly a difference in tshock versions, but I didn't
+        // want to risk messing around with dependencies.
+        /*
+        void OnBroadcast(ServerBroadcastEventArgs e)
+        {
+            //Debug.Assert(true == false);
+            if (!IrcClient.IsConnected)
+                Connect();
+            else if (e.Message != null && !String.IsNullOrEmpty(Config.ServerChatMessageFormat))
+            {
+                SendMessage(Config.Channel, String.Format(Config.ServerBroadcastMessageFormat, e.Message));
+            }
+        }
+        */
+
+        void OnChat(ServerChatEventArgs e)
 		{
 			TSPlayer tsPlr = TShock.Players[e.Who];
 			if (!IrcClient.IsConnected)
@@ -175,22 +195,23 @@ namespace TShockIRC
 		#region Commands
 		void IRCReload(CommandArgs e)
 		{
-			string configPath = Path.Combine(TShock.SavePath, "tshockircconfig.json");
+            string configPath = Path.Combine(TShock.SavePath, "tshockircconfig.json");
 			(Config = Config.Read(configPath)).Write(configPath);
 			e.Player.SendSuccessMessage("Reloaded IRC config!");
 		}
 		void IRCRestart(CommandArgs e)
 		{
-			IrcClient.Quit("Restarting...");
+            IrcClient.Quit("Restarting...");
 			IrcUsers.Clear();
 
-			IrcClient = new IrcClient();
+            IrcClient = new IrcClient();
 			IrcClient.Connect(Config.Server, Config.Port, Config.SSL,
 				new IrcUserRegistrationInfo()
 				{
 					NickName = Config.Nick,
 					RealName = Config.RealName,
 					UserName = Config.UserName,
+                    Password = Config.Password,
 					UserModes = new List<char> { 'i', 'w' }
 				});
 			IrcClient.Registered += OnIRCRegistered;
@@ -203,11 +224,11 @@ namespace TShockIRC
 		#region IRC client events
 		void OnIRCDisconnected(object sender, EventArgs e)
 		{
-			Connect();
+            Connect();
 		}
 		void OnIRCRegistered(object sender, EventArgs e)
 		{
-			Connecting = false;
+            Connecting = false;
 			foreach (string command in Config.ConnectCommands)
 				IrcClient.SendRawMessage(command);
 			IrcClient.Channels.Join(new List<Tuple<string, string>>
@@ -220,7 +241,14 @@ namespace TShockIRC
 		}
 		void OnIRCJoinedChannel(object sender, IrcChannelEventArgs e)
 		{
-			e.Channel.MessageReceived += OnChannelMessage;
+            //~ Avoid calling events multiple times by attempting to remove any existing hooks first.
+            //~ This is important if the client tries to join the channel when the server already has it joined, like with ZNC.
+            e.Channel.MessageReceived -= OnChannelMessage;
+            e.Channel.UserJoined -= OnChannelJoined;
+            e.Channel.UserKicked -= OnChannelKicked;
+            e.Channel.UserLeft -= OnChannelLeft;
+            e.Channel.UsersListReceived -= OnChannelUsersList;
+            e.Channel.MessageReceived += OnChannelMessage;
 			e.Channel.UserJoined += OnChannelJoined;
 			e.Channel.UserKicked += OnChannelKicked;
 			e.Channel.UserLeft += OnChannelLeft;
@@ -228,12 +256,17 @@ namespace TShockIRC
 		}
 		void OnIRCMessageReceived(object sender, IrcMessageEventArgs e)
 		{
-			IRCCommands.Execute(e.Text, (IrcUser)e.Source, (IIrcMessageTarget)e.Source);
+            // Add an exception for any messages starting with "\u00035" to avoid infinite loopback when sending commands from the bot's own account.
+            // Yes, I added it in two places. I really hate loops.
+            if (!e.Text.StartsWith("\u00035"))
+            {
+                IRCCommands.Execute(e.Text, (IrcUser)e.Source, (IIrcMessageTarget)e.Source);
+            }
 		}
 		
 		void OnChannelJoined(object sender, IrcChannelUserEventArgs e)
 		{
-			if (Config.IgnoredIRCNicks.Contains(e.ChannelUser.User.NickName))
+            if (Config.IgnoredIRCNicks.Contains(e.ChannelUser.User.NickName))
 				return;
 
 			if (String.Equals(e.ChannelUser.Channel.Name, Config.Channel, StringComparison.OrdinalIgnoreCase))
@@ -248,7 +281,7 @@ namespace TShockIRC
 		}
 		void OnChannelKicked(object sender, IrcChannelUserEventArgs e)
 		{
-			if (Config.IgnoredIRCNicks.Contains(e.ChannelUser.User.NickName))
+            if (Config.IgnoredIRCNicks.Contains(e.ChannelUser.User.NickName))
 				return;
 
 			if (String.Equals(e.ChannelUser.Channel.Name, Config.Channel, StringComparison.OrdinalIgnoreCase))
@@ -260,7 +293,7 @@ namespace TShockIRC
 		}
 		void OnChannelLeft(object sender, IrcChannelUserEventArgs e)
 		{
-			if (Config.IgnoredIRCNicks.Contains(e.ChannelUser.User.NickName))
+            if (Config.IgnoredIRCNicks.Contains(e.ChannelUser.User.NickName))
 				return;
 
 			if (String.Equals(e.ChannelUser.Channel.Name, Config.Channel, StringComparison.OrdinalIgnoreCase))
@@ -272,18 +305,28 @@ namespace TShockIRC
 		}
 		void OnChannelMessage(object sender, IrcMessageEventArgs e)
 		{
-			if (Config.IgnoredIRCNicks.Contains(((IrcUser)e.Source).NickName) ||
+            if (Config.IgnoredIRCNicks.Contains(((IrcUser)e.Source).NickName) ||
 				Config.IgnoredIRCChatRegexes.Any(s => Regex.IsMatch(e.Text, s)))
 				return;
 
 			var ircChannel = ((IrcChannel)e.Targets[0]);
 			var ircUser = (IrcUser)e.Source;
 
-			if (e.Text.StartsWith(Config.BotPrefix))
-				IRCCommands.Execute(e.Text.Substring(Config.BotPrefix.Length), ircUser, (IIrcMessageTarget)sender);
-			else if (String.Equals(ircChannel.Name, Config.Channel, StringComparison.OrdinalIgnoreCase))
+            // It was responding to bot commands on all joined channels, which also was problematic with multiple
+            // logins to the same account using ZNC connecting to Twitch. Rearranged so it only listens to the chat
+            // and admin channels, period.
+            if (String.Equals(ircChannel.Name, Config.AdminChannel, StringComparison.OrdinalIgnoreCase))
+            {
+                IRCCommands.Execute(e.Text, ircUser, (IIrcMessageTarget)sender);
+            }
+            else if (String.Equals(ircChannel.Name, Config.Channel, StringComparison.OrdinalIgnoreCase))
 			{
-				IrcChannelUser ircChannelUser = ircChannel.GetChannelUser(ircUser);
+                if (e.Text.StartsWith(Config.BotPrefix))
+                {
+                    IRCCommands.Execute(e.Text.Substring(Config.BotPrefix.Length), ircUser, (IIrcMessageTarget)sender);
+                    return;
+                }
+                IrcChannelUser ircChannelUser = ircChannel.GetChannelUser(ircUser);
 				if (!String.IsNullOrEmpty(Config.IRCChatModesRequired) && ircChannelUser != null &&
 					!ircChannelUser.Modes.Intersect(Config.IRCChatModesRequired).Any())
 				{
@@ -306,15 +349,24 @@ namespace TShockIRC
 				{
 					if (!String.IsNullOrEmpty(Config.IRCChatMessageFormat))
 					{
-						Group group = IrcUsers[ircUser];
-						TShock.Utils.Broadcast(String.Format(Config.IRCChatMessageFormat, group.Prefix, e.Source.Name, text), group.R, group.G, group.B);
-					}
+                        // IrcUsers may or may not actually know the user and have the key.
+                        // Presumably this used to be fine returning null, but now it crashes.
+                        if (IrcUsers.ContainsKey(ircUser))
+                        {
+                            Group group = IrcUsers[ircUser];
+                            TShock.Utils.Broadcast(String.Format(Config.IRCChatMessageFormat, group.Prefix, e.Source.Name, text), group.R, group.G, group.B);
+                        }
+                        else
+                        {
+                            TShock.Utils.Broadcast(String.Format(Config.IRCChatMessageFormat, "", e.Source.Name, text), Color.White);
+                        }
+                    }
 				}
 			}
 		}
 		void OnChannelUsersList(object sender, EventArgs e)
 		{
-			var ircChannel = (IrcChannel)sender;
+            var ircChannel = (IrcChannel)sender;
 			if (String.Equals(ircChannel.Name, Config.Channel, StringComparison.OrdinalIgnoreCase))
 			{
 				foreach (IrcChannelUser ircChannelUser in ircChannel.Users.Where(icu => !Config.IgnoredIRCNicks.Contains(icu.User.NickName)))
@@ -328,7 +380,7 @@ namespace TShockIRC
 
 		void OnUserQuit(object sender, IrcCommentEventArgs e)
 		{
-			var ircUser = (IrcUser)sender;
+            var ircUser = (IrcUser)sender;
 			IrcUsers.Remove(ircUser);
 
 			if (!String.IsNullOrEmpty(Config.IRCQuitMessageFormat))
@@ -338,7 +390,7 @@ namespace TShockIRC
 
 		public static void SendMessage(IIrcMessageTarget target, string msg)
 		{
-			msg = msg.Replace("\0", "");
+            msg = msg.Replace("\0", "");
 			msg = msg.Replace("\r", "");
 			msg = msg.Replace("\n", "");
 

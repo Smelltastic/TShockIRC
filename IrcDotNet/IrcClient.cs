@@ -64,7 +64,10 @@ namespace IrcDotNet
         {
             regexNickName = @"(?<nick>[^!@]+)";
             regexUserName = @"(?<user>[^!@]+)";
-            regexHostName = @"(?<host>[^%@]+)";
+            // Twitch gives us an empty host name, returning "User!nick@", so change the + to a * to make it optional.
+            // As far as I can tell, the empty host doesn't seem to cause any problems.
+            //regexHostName = @"(?<host>[^%@]+)";
+            regexHostName = @"(?<host>[^%@]*)";
             regexChannelName = @"(?<channel>[#+!&].+)";
             regexTargetMask = @"(?<targetMask>[$#].+)";
             regexServerName = @"(?<server>[^%@]+?\.[^%@]*)";
@@ -1484,6 +1487,9 @@ namespace IrcDotNet
                     var message = this.messageSendQueue.Dequeue();
                     var line = message.Item1;
                     var token = message.Item2;
+                    // An error that occurs later is actually caused by message.Item2 being null here.
+                    // I haven't identified the cause.
+                    Debug.Assert(token != null);
                     var lineBuffer = this.textEncoding.GetBytes(line);
                     SendAsync(lineBuffer, token);
 
@@ -2156,10 +2162,6 @@ namespace IrcDotNet
             DebugUtilities.WriteEvent(string.Format("Connected to server at '{0}'.",
                 ((IPEndPoint)this.socket.RemoteEndPoint).Address));
 
-            if (regInfo.Password != null)
-                // Authenticate with server using password.
-                SendMessagePassword(regInfo.Password);
-
             // Check if client is registering as service or normal user.
             if (regInfo is IrcServiceRegistrationInfo)
             {
@@ -2167,6 +2169,12 @@ namespace IrcDotNet
                 var serviceRegInfo = (IrcServiceRegistrationInfo)regInfo;
                 SendMessageService(serviceRegInfo.NickName, serviceRegInfo.Distribution,
                     serviceRegInfo.Description);
+
+                // At least in ZNC, the password actually needs to be sent AFTER sending the user info.
+                // It seems to just never get there otherwise, according to Wireshark.
+                if (regInfo.Password != null)
+                    // Authenticate with server using password.
+                    SendMessagePassword(regInfo.Password);
 
                 this.localUser = new IrcLocalUser(serviceRegInfo.NickName, serviceRegInfo.Distribution,
                     serviceRegInfo.Description);
@@ -2178,6 +2186,12 @@ namespace IrcDotNet
                 SendMessageNick(userRegInfo.NickName);
                 SendMessageUser(userRegInfo.UserName, GetNumericUserMode(userRegInfo.UserModes),
                     userRegInfo.RealName);
+
+                // At least in ZNC, the password actually needs to be sent AFTER sending the user info.
+                // It seems to just never get there otherwise, according to Wireshark.
+                if (regInfo.Password != null)
+                    // Authenticate with server using password.
+                    SendMessagePassword(regInfo.Password);
 
                 this.localUser = new IrcLocalUser(userRegInfo.NickName, userRegInfo.UserName, userRegInfo.RealName,
                     userRegInfo.UserModes);

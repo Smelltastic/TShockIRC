@@ -16,6 +16,10 @@ namespace TShockIRC
 		public string Server = "localhost";
 		public bool SSL = false;
 		public string UserName = "TShock";
+        // Discrete password option added. ConnectCommands don't seem to be sufficient because they
+        // don't appear to send until after you're authenticated, with PASS auth anyhow.
+        // Users need to be informed this is for PASS auth though, NOT NickServ.
+        public string Password = "";
 
 		public string BotPrefix = ".";
 		public string[] IgnoredCommands = new string[] { };
@@ -31,6 +35,9 @@ namespace TShockIRC
 		public string IRCLeaveMessageFormat = "(IRC) {0} has left ({1}).";
 		public string IRCQuitMessageFormat = "(IRC) {0} has quit ({1}).";
 		public string ServerActionMessageFormat = "\u000302\u0002* {0}\u000f {1}";
+        // Failed attempt at echoing server broadcasts to IRC.
+        // Leaving this here potentially for the future.
+        //public string ServerBroadcastMessageFormat = "\u000302(Server Broadcast) {0}";
 		public string ServerCommandMessageFormat = "\u000302{0}<{1}>\u000f executed /{2}";
 		public string ServerChatMessageFormat = "\u000302{0}<{1}>\u000f {2}{3}";
 		public string ServerJoinMessageFormat = "\u000303{0} has joined.";
