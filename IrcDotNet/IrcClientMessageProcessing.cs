@@ -293,13 +293,13 @@ namespace IrcDotNet
 
             // Extract nick name, user name, and host name from welcome message. Use fallback info if not present.
 
-            // Disabling due to twitch's bizarre welcome message. We should know our nick already anyhow.
-            // Ignoring it should probably be a config option instead though.
             var nickNameIdMatch = Regex.Match(this.WelcomeMessage.Split(' ').Last(), regexNickNameId);
-            //this.localUser.NickName = nickNameIdMatch.Groups["nick"].GetValue() ?? this.localUser.NickName;
-            //this.localUser.UserName = nickNameIdMatch.Groups["user"].GetValue() ?? this.localUser.UserName;
             this.localUser.HostName = nickNameIdMatch.Groups["host"].GetValue() ?? this.localUser.HostName;
-
+            if (!this.localUser.IgnoreServerWelcomeInfo)
+            {
+                this.localUser.NickName = nickNameIdMatch.Groups["nick"].GetValue() ?? this.localUser.NickName;
+                this.localUser.UserName = nickNameIdMatch.Groups["user"].GetValue() ?? this.localUser.UserName;
+            }
             this.isRegistered = true;
             OnRegistered(new EventArgs());
         }

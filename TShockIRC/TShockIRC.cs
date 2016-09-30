@@ -57,14 +57,15 @@ namespace TShockIRC
 			Connecting = true;
 			IrcUsers.Clear();
 			IrcClient = new IrcClient();
-            IrcClient.Connect(Config.Server, Config.Port, Config.SSL,
+            IrcClient.Connect( (String)Config.Server, Config.Port, Config.SSL,
 				new IrcUserRegistrationInfo()
 				{
 					NickName = Config.Nick,
 					RealName = Config.RealName,
 					UserName = Config.UserName,
-                    // Add password to config
                     Password = Config.Password,
+                    PassAfterNick = Config.PassAfterNick,
+                    IgnoreServerWelcomeInfo = Config.IgnoreServerWelcomeInfo,
 					UserModes = new List<char> { 'i', 'w' }
 				});
 			IrcClient.Disconnected += OnIRCDisconnected;
@@ -100,8 +101,7 @@ namespace TShockIRC
 		}
 
         // An attempt to handle server broadcasts, except it actually just picks up player chats
-        // and not server broadcasts at all. Possibly a difference in tshock versions, but I didn't
-        // want to risk messing around with dependencies.
+        // and not server broadcasts at all.
         /*
         void OnBroadcast(ServerBroadcastEventArgs e)
         {
@@ -124,7 +124,7 @@ namespace TShockIRC
 				!tsPlr.mute && tsPlr.Group.HasPermission(Permissions.canchat) && !String.IsNullOrEmpty(Config.ServerChatMessageFormat) &&
 				!Config.IgnoredServerChatRegexes.Any(s => Regex.IsMatch(e.Text, s)))
 			{
-				SendMessage(Config.Channel, String.Format(Config.ServerChatMessageFormat, tsPlr.Group.Prefix, tsPlr.Name, e.Text, tsPlr.Group.Suffix));
+				SendMessage(Config.Channel, String.Format(Config.ServerChatMessageFormat, tsPlr.Group.Prefix, tsPlr.Name, e.Text, tsPlr.Group.Suffix, Main.worldName));
 			}
 		}
 		void OnGreetPlayer(GreetPlayerEventArgs e)
@@ -135,9 +135,9 @@ namespace TShockIRC
 			{
 				TSPlayer tsplr = TShock.Players[e.Who];
 				if (!String.IsNullOrEmpty(Config.ServerJoinMessageFormat))
-					SendMessage(Config.Channel, String.Format(Config.ServerJoinMessageFormat, tsplr.Name));
+					SendMessage(Config.Channel, String.Format(Config.ServerJoinMessageFormat, tsplr.Name, "", "", "", Main.worldName));
 				if (!String.IsNullOrEmpty(Config.ServerJoinAdminMessageFormat))
-					SendMessage(Config.AdminChannel, String.Format(Config.ServerJoinAdminMessageFormat, tsplr.Name, tsplr.IP));
+					SendMessage(Config.AdminChannel, String.Format(Config.ServerJoinAdminMessageFormat, tsplr.Name, tsplr.IP, "", "", Main.worldName));
 			}
 		}
 		void OnInitialize(EventArgs e)
@@ -161,9 +161,9 @@ namespace TShockIRC
 			else if (tsplr != null && tsplr.ReceivedInfo && tsplr.State >= 3 && !tsplr.SilentKickInProgress)
 			{
 				if (!String.IsNullOrEmpty(Config.ServerLeaveMessageFormat))
-					SendMessage(Config.Channel, String.Format(Config.ServerLeaveMessageFormat, tsplr.Name));
+					SendMessage(Config.Channel, String.Format(Config.ServerLeaveMessageFormat, tsplr.Name, "", "", "", Main.worldName));
 				if (!String.IsNullOrEmpty(Config.ServerLeaveAdminMessageFormat))
-					SendMessage(Config.AdminChannel, String.Format(Config.ServerLeaveAdminMessageFormat, tsplr.Name, tsplr.IP));
+					SendMessage(Config.AdminChannel, String.Format(Config.ServerLeaveAdminMessageFormat, tsplr.Name, tsplr.IP, "", "", Main.worldName));
 			}
 		}
 		void OnPlayerCommand(PlayerCommandEventArgs e)
@@ -175,12 +175,12 @@ namespace TShockIRC
 				if (String.Equals(e.CommandName, "me", StringComparison.CurrentCultureIgnoreCase) && e.CommandText.Length > 2)
 				{
 					if (!e.Player.mute && e.Player.Group.HasPermission(Permissions.cantalkinthird) && !String.IsNullOrEmpty(Config.ServerActionMessageFormat))
-						SendMessage(Config.Channel, String.Format(Config.ServerActionMessageFormat, e.Player.Name, e.CommandText.Substring(3)));
+						SendMessage(Config.Channel, String.Format(Config.ServerActionMessageFormat, e.Player.Name, e.CommandText.Substring(3), "", "", Main.worldName));
 				}
 				else if (e.CommandList.Count() == 0 || e.CommandList.First().DoLog)
 				{
 					if (!String.IsNullOrEmpty(Config.ServerCommandMessageFormat))
-						SendMessage(Config.AdminChannel, String.Format(Config.ServerCommandMessageFormat, e.Player.Group.Prefix, e.Player.Name, e.CommandText));
+						SendMessage(Config.AdminChannel, String.Format(Config.ServerCommandMessageFormat, e.Player.Group.Prefix, e.Player.Name, e.CommandText, e.Player.Group.Suffix, Main.worldName));
 				}
 			}
 		}
@@ -189,7 +189,7 @@ namespace TShockIRC
 			if (!IrcClient.IsConnected)
 				Connect();
 			else if (!String.IsNullOrEmpty(Config.ServerLoginAdminMessageFormat))
-				SendMessage(Config.AdminChannel, String.Format(Config.ServerLoginAdminMessageFormat, e.Player.Name, e.Player.User.Name, e.Player.IP));
+				SendMessage(Config.AdminChannel, String.Format(Config.ServerLoginAdminMessageFormat, e.Player.Name, e.Player.User.Name, e.Player.IP, "", Main.worldName));
 		}
 
 		#region Commands
@@ -205,7 +205,7 @@ namespace TShockIRC
 			IrcUsers.Clear();
 
             IrcClient = new IrcClient();
-			IrcClient.Connect(Config.Server, Config.Port, Config.SSL,
+			IrcClient.Connect( (String)Config.Server, Config.Port, Config.SSL,
 				new IrcUserRegistrationInfo()
 				{
 					NickName = Config.Nick,
@@ -219,9 +219,13 @@ namespace TShockIRC
 
 			e.Player.SendInfoMessage("Restarted the IRC bot.");
 		}
-		#endregion
+        #endregion
 
-		#region IRC client events
+        #region IRC client events
+        void OnIRCConnected(object sender, EventArgs e)
+        {
+            
+        }
 		void OnIRCDisconnected(object sender, EventArgs e)
 		{
             Connect();
@@ -241,8 +245,8 @@ namespace TShockIRC
 		}
 		void OnIRCJoinedChannel(object sender, IrcChannelEventArgs e)
 		{
-            //~ Avoid calling events multiple times by attempting to remove any existing hooks first.
-            //~ This is important if the client tries to join the channel when the server already has it joined, like with ZNC.
+            // Avoid calling events multiple times by attempting to remove any existing hooks first.
+            // This is important if the client tries to join the channel when the server already has it joined, as can happen in ZNC.
             e.Channel.MessageReceived -= OnChannelMessage;
             e.Channel.UserJoined -= OnChannelJoined;
             e.Channel.UserKicked -= OnChannelKicked;
@@ -349,12 +353,22 @@ namespace TShockIRC
 				{
 					if (!String.IsNullOrEmpty(Config.IRCChatMessageFormat))
 					{
+
+                        if (Config.BotIRCNicks.Contains(e.Source.Name, StringComparer.OrdinalIgnoreCase))
+                        {
+                            // Get rid of formatting digits
+                            if( text.Substring(0,2).All( Char.IsDigit ) )
+                            {
+                                text = text.Substring(2);
+                            }
+                            TShock.Utils.Broadcast(String.Format(Config.IRCChatFromBotFormat, "", e.Source.Name, text), Color.White );
+                        }
                         // IrcUsers may or may not actually know the user and have the key.
                         // Presumably this used to be fine returning null, but now it crashes.
-                        if (IrcUsers.ContainsKey(ircUser))
+                        else if (IrcUsers.ContainsKey(ircUser))
                         {
                             Group group = IrcUsers[ircUser];
-                            TShock.Utils.Broadcast(String.Format(Config.IRCChatMessageFormat, group.Prefix, e.Source.Name, text), group.R, group.G, group.B);
+                            TShock.Utils.Broadcast(String.Format(Config.IRCChatMessageFormat, group.Prefix, e.Source.Name, text, group.Suffix), group.R, group.G, group.B);
                         }
                         else
                         {

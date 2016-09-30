@@ -79,6 +79,16 @@ namespace IrcDotNet
         }
 
         /// <summary>
+        /// Whether our given info should override the welcome message from the server.
+        /// </summary>
+        /// <value>TRUE if we should ignore the server's welcome message declaring our name, false otherwise.</value>
+        public bool IgnoreServerWelcomeInfo
+        {
+            get;
+            set;
+        } = false;
+
+        /// <summary>
         /// Gets or sets the modes of the local user to set initially.
         /// The collection should not contain any characters except 'w' or 'i'.
         /// The modes can be changed after registration.
@@ -113,6 +123,17 @@ namespace IrcDotNet
             get;
             set;
         }
+
+        /// <summary>
+        /// Whether the password needs to be sent after the nick, instead of before.
+        /// </summary>
+        /// <value>False to send PASS immediately on connect, True to send it after the nick.</value>
+        public bool PassAfterNick
+        {
+            get;
+            set;
+        } = false;
+
 
         /// <summary>
         /// Gets or sets the nick name of the local user to set initially upon registration.

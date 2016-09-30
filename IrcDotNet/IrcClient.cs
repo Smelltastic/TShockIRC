@@ -1778,6 +1778,8 @@ namespace IrcDotNet
         /// <exception cref="ObjectDisposedException">The current instance has already been disposed.</exception>
         public void Connect(EndPoint remoteEndPoint, bool useSsl, IrcRegistrationInfo registrationInfo)
         {
+            string hostName = "";
+
             CheckDisposed();
 
             if (registrationInfo == null)
@@ -1787,7 +1789,24 @@ namespace IrcDotNet
             ResetState();
 
             // Connect socket to remote host.
-            ConnectAsync(remoteEndPoint, Tuple.Create(useSsl, string.Empty, registrationInfo));
+            //ConnectAsync(remoteEndPoint, Tuple.Create(useSsl, string.Empty, registrationInfo));
+            // We absolutely need the hostname here for SSL connections rather than sending it an empty string. How is SSL supposed to work otherwise?
+            if( remoteEndPoint is DnsEndPoint )
+            {
+                DnsEndPoint DEP = (DnsEndPoint)remoteEndPoint;
+                hostName = DEP.Host;
+            }
+            else
+            {
+                if (remoteEndPoint is IPEndPoint)
+                {
+                    IPEndPoint IEP = (IPEndPoint)remoteEndPoint;
+                    hostName = IEP.Address.ToString();
+                }
+                Debug.Assert(useSsl == false, "SSL will not work when connecting by IP. Either turn off SSL or specify a hostname!");
+            }
+
+            ConnectAsync(remoteEndPoint, Tuple.Create(useSsl, hostName, registrationInfo));
 
             HandleClientConnecting();
         }
@@ -2038,6 +2057,7 @@ namespace IrcDotNet
 #if SILVERLIGHT
                 this.dataStream = this.receiveStream;
 #else
+                Debug.Assert(token.Item2 != null && token.Item2 != "");
                 this.dataStream = GetDataStream(token.Item1, token.Item2);
 #endif
                 this.dataStreamReader = new StreamReader(this.dataStream, this.textEncoding);
@@ -2124,8 +2144,9 @@ namespace IrcDotNet
 
         private Stream GetDataStream(bool useSsl, string targetHost)
         {
-            if (useSsl)
+            if (useSsl && this.receiveStream.Length > 0 )
             {
+                //Debug.Assert(true == false);
                 // Create SSL stream over network stream to use for data transmission.
                 var sslStream = new SslStream(this.receiveStream, true,
                     new RemoteCertificateValidationCallback(SslUserCertificateValidationCallback));
@@ -2162,6 +2183,10 @@ namespace IrcDotNet
             DebugUtilities.WriteEvent(string.Format("Connected to server at '{0}'.",
                 ((IPEndPoint)this.socket.RemoteEndPoint).Address));
 
+            if (regInfo.Password != null && !regInfo.PassAfterNick)
+                // Authenticate with server using password.
+                SendMessagePassword(regInfo.Password);
+
             // Check if client is registering as service or normal user.
             if (regInfo is IrcServiceRegistrationInfo)
             {
@@ -2170,9 +2195,7 @@ namespace IrcDotNet
                 SendMessageService(serviceRegInfo.NickName, serviceRegInfo.Distribution,
                     serviceRegInfo.Description);
 
-                // At least in ZNC, the password actually needs to be sent AFTER sending the user info.
-                // It seems to just never get there otherwise, according to Wireshark.
-                if (regInfo.Password != null)
+                if (regInfo.Password != null && regInfo.PassAfterNick)
                     // Authenticate with server using password.
                     SendMessagePassword(regInfo.Password);
 
@@ -2187,14 +2210,13 @@ namespace IrcDotNet
                 SendMessageUser(userRegInfo.UserName, GetNumericUserMode(userRegInfo.UserModes),
                     userRegInfo.RealName);
 
-                // At least in ZNC, the password actually needs to be sent AFTER sending the user info.
-                // It seems to just never get there otherwise, according to Wireshark.
-                if (regInfo.Password != null)
+                if (regInfo.Password != null && regInfo.PassAfterNick)
                     // Authenticate with server using password.
                     SendMessagePassword(regInfo.Password);
 
                 this.localUser = new IrcLocalUser(userRegInfo.NickName, userRegInfo.UserName, userRegInfo.RealName,
                     userRegInfo.UserModes);
+                this.localUser.IgnoreServerWelcomeInfo = userRegInfo.IgnoreServerWelcomeInfo;
             }
             this.localUser.Client = this;
 

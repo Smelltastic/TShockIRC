@@ -62,6 +62,16 @@ namespace IrcDotNet
         }
 
         /// <summary>
+        /// Sets whether this user's nick/username shouldn't be updated by the server welcome message.
+        /// </summary>
+        /// <value>True to skip setting nick/username from the server's welcome message, false otherwise.</value>
+        public bool IgnoreServerWelcomeInfo
+        {
+            set;
+            get;
+        } = false;
+
+        /// <summary>
         /// Gets a read-only collection of the modes the user currently has.
         /// </summary>
         /// <value>The current modes of the user.</value>
