@@ -10,6 +10,7 @@ using Terraria;
 using TerrariaApi.Server;
 using TShockAPI;
 using TShockAPI.Hooks;
+using PlayerDB;
 
 using Group = TShockAPI.Group;
 
@@ -127,7 +128,7 @@ namespace TShockIRC
                 !Config.IgnoredServerChatRegexes.Any(s => Regex.IsMatch(e.Text, s)))
             {
                 //SendMessage(Config.Channel, String.Format(Config.ServerChatMessageFormat, tsPlr.Group.Prefix, tsPlr.Name, e.Text, tsPlr.Group.Suffix, Main.worldName));
-                 SendToListeningChannels(tsPlr.User.ID, (IsSending(tsPlr.User.ID, "transparently")?e.Text:String.Format(Config.ServerChatMessageFormat, tsPlr.Group.Prefix, tsPlr.Name, e.Text, tsPlr.Group.Suffix, Main.worldName) ));
+                 SendToListeningChannels(tsPlr, (IsSending(tsPlr, "transparently")?e.Text:String.Format(Config.ServerChatMessageFormat, tsPlr.Group.Prefix, tsPlr.Name, e.Text, tsPlr.Group.Suffix, Main.worldName) ));
             }
         }
         void OnGreetPlayer(GreetPlayerEventArgs e)
@@ -137,144 +138,115 @@ namespace TShockIRC
             else
             {
                 TSPlayer tsplr = TShock.Players[e.Who];
-                if (!String.IsNullOrEmpty(Config.ServerJoinMessageFormat) && !IsSending(tsplr.User.ID, "transparently"))
-                    SendToListeningChannels(tsplr.User.ID, String.Format(Config.ServerJoinMessageFormat, tsplr.Name, "", "", "", Main.worldName));
+                if (!String.IsNullOrEmpty(Config.ServerJoinMessageFormat) && !IsSending(tsplr, "transparently"))
+                    SendToListeningChannels(tsplr, String.Format(Config.ServerJoinMessageFormat, tsplr.Name, "", "", "", Main.worldName));
                 if (!String.IsNullOrEmpty(Config.ServerJoinAdminMessageFormat))
                     SendMessage(Config.AdminChannel, String.Format(Config.ServerJoinAdminMessageFormat, tsplr.Name, tsplr.IP, "", "", Main.worldName));
                 SendChanInfo(tsplr, "");
             }
         }
 
-        public bool GetChannelProperty(int uid, string channel, string property)
+        public bool GetChannelProperty(TSPlayer player, string channel, string property)
         {
-            string chans = db.GetUserData(uid, property);
+            string chans = db.GetUserData(player, property);
             if( chans == null )
             {
                 chans = String.Join(" ", Config.Channels);
-                db.SetUserData(uid, new String[] { chans, "" }); // Initialize listening to everything but not sending
+                db.SetUserData(player, new String[] { chans, "" }); // Initialize listening to everything but not sending
             }
             return chans.Split(' ').Contains(channel, StringComparer.OrdinalIgnoreCase);
         }
 
-        public void SetChannelProperty(int uid, string channel, string property, bool set_to)
+        public void SetChannelProperty(TSPlayer player, string channel, string property, bool set_to)
         {
-            if (GetChannelProperty(uid, channel, property) != set_to)
+            if (GetChannelProperty(player, channel, property) != set_to)
             {
                 if (set_to)
                 {
-                    if (db.GetUserData(uid, property).Length < 2)
+                    if (db.GetUserData(player, property).Length < 2)
                     {
-                        db.SetUserData(uid, property, channel);
+                        db.SetUserData(player, property, channel);
                     }
                     else
                     {
-                        db.SetUserData(uid, property, db.GetUserData(uid, property) + " " + channel);
+                        db.SetUserData(player, property, db.GetUserData(player, property) + " " + channel);
                     }
                 }
                 else
                 {
-                    if (db.GetUserData(uid, property) == channel)
+                    if (db.GetUserData(player, property) == channel)
                     {
-                        db.SetUserData(uid, property, "");
+                        db.SetUserData(player, property, "");
                     }
                     else
                     {
-                        string chans = db.GetUserData(uid, property);
+                        string chans = db.GetUserData(player, property);
                         if (chans == null)
                         {
                             chans = String.Join(" ", Config.Channels);
-                            db.SetUserData(uid, new List<string> { chans, chans });
+                            db.SetUserData(player, new List<string> { chans, chans });
                         }
                         //return chans.Split(' ').Contains(channel, StringComparer.OrdinalIgnoreCase);
-                        db.SetUserData(uid, property, chans.Replace(channel, "").Replace("  ", " ").Trim());
+                        db.SetUserData(player, property, chans.Replace(channel, "").Replace("  ", " ").Trim());
                         if( property == "listening" && !set_to )
                         {
-                            SetSending(uid, channel, false);
+                            SetSending(player, channel, false);
                         }
                         else if( property == "sending" && set_to )
                         {
-                            SetListening(uid, channel, true);
+                            SetListening(player, channel, true);
                         }
                     }
                 }
             }
         }
 
-        public bool ToggleChannelProperty(int uid, string channel, string property)
+        public bool ToggleChannelProperty(TSPlayer player, string channel, string property)
         {
-            bool to = (!GetChannelProperty(uid, channel, property));
-            SetChannelProperty(uid, channel, property, to);
+            bool to = (!GetChannelProperty(player, channel, property));
+            SetChannelProperty(player, channel, property, to);
             return to;
         }
 
-        public bool ToggleListening(int uid, string channel)
+        public bool ToggleListening(TSPlayer player, string channel)
         {
-            return ToggleChannelProperty(uid, channel, "listening");
+            return ToggleChannelProperty(player, channel, "listening");
         }
 
-        public bool ToggleSending(int uid, string channel)
+        public bool ToggleSending(TSPlayer player, string channel)
         {
-            return ToggleChannelProperty(uid, channel, "sending");
+            return ToggleChannelProperty(player, channel, "sending");
         }
 
-        public bool ToggleListening(TSPlayer p, string channel)
+        public bool IsListening(TSPlayer player, string channel)
         {
-            return ToggleListening(p.User.ID, channel);
+            return GetChannelProperty(player, channel, "listening");
         }
 
-        public bool ToggleSending(TSPlayer p, string channel)
+        public void SetListening(TSPlayer player, string channel, bool set_to)
         {
-            return ToggleSending(p.User.ID, channel);
+            SetChannelProperty(player, channel, "listening", set_to);
         }
 
-        public bool IsListening(int uid, string channel)
+        public bool IsSending(TSPlayer player, string channel)
         {
-            return GetChannelProperty(uid, channel, "listening");
+            return GetChannelProperty(player, channel, "sending");
         }
 
-        public bool IsListening(TSPlayer p, string channel)
+        public void SetSending(TSPlayer player, string channel, bool set_to)
         {
-            return GetChannelProperty(p.User.ID, channel, "listening");
+            SetChannelProperty(player, channel, "sending", set_to);
         }
 
-        public void SetListening(int uid, string channel, bool set_to)
-        {
-            SetChannelProperty(uid, channel, "listening", set_to);
-        }
-
-        public void SetListening(TSPlayer p, string channel, bool set_to)
-        {
-            SetChannelProperty(p.User.ID, channel, "listening", set_to);
-        }
-
-        public bool IsSending(int uid, string channel)
-        {
-            return GetChannelProperty(uid, channel, "sending");
-        }
-
-        public bool IsSending(TSPlayer p, string channel)
-        {
-            return GetChannelProperty(p.User.ID, channel, "sending");
-        }
-
-        public void SetSending(int uid, string channel, bool set_to)
-        {
-            SetChannelProperty(uid, channel, "sending", set_to);
-        }
-
-        public void SetSending(TSPlayer p, string channel, bool set_to)
-        {
-            SetChannelProperty(p.User.ID, channel, "sending", set_to);
-        }
-        public void SendToListeningChannels(int uid, string msg)
+        public void SendToListeningChannels(TSPlayer player, string msg)
         {
             LastOutgoing = msg;
             foreach ( string chan in Config.Channels )
             {
-                if (IsSending(uid, chan))
+                if (IsSending(player, chan))
                 {
                     SendMessage(chan, msg);
-                    BroadcastToListeners(chan, msg, Color.White, uid);
+                    BroadcastToListeners(chan, msg, Color.White, player.User.ID);
                 }
             }
         }
@@ -289,7 +261,7 @@ namespace TShockIRC
 			string configPath = Path.Combine(TShock.SavePath, "tshockircconfig.json");
 			(Config = Config.Read(configPath)).Write(configPath);
 
-            db.Connect("IRCPlayers", new string[]{ "listening", "sending" } );
+            db.Connect("tshockircplayers", new string[]{ "listening", "sending" } );
 		}
 
 		void OnPostInitialize(EventArgs e)
@@ -303,8 +275,8 @@ namespace TShockIRC
 				Connect();
 			else if (tsplr != null && tsplr.ReceivedInfo && tsplr.State >= 3 && !tsplr.SilentKickInProgress)
 			{
-				if (!String.IsNullOrEmpty(Config.ServerLeaveMessageFormat) && ! IsSending( tsplr.User.ID, "transparently" ) )
-                    SendToListeningChannels(tsplr.User.ID, String.Format(Config.ServerLeaveMessageFormat, tsplr.Name, "", "", "", Main.worldName));
+				if (!String.IsNullOrEmpty(Config.ServerLeaveMessageFormat) && ! IsSending( tsplr, "transparently" ) )
+                    SendToListeningChannels(tsplr, String.Format(Config.ServerLeaveMessageFormat, tsplr.Name, "", "", "", Main.worldName));
 				if (!String.IsNullOrEmpty(Config.ServerLeaveAdminMessageFormat))
 					SendMessage(Config.AdminChannel, String.Format(Config.ServerLeaveAdminMessageFormat, tsplr.Name, tsplr.IP, "", "", Main.worldName));
 			}
@@ -317,8 +289,8 @@ namespace TShockIRC
 			{
 				if (String.Equals(e.CommandName, "me", StringComparison.CurrentCultureIgnoreCase) && e.CommandText.Length > 2)
 				{
-					if (!e.Player.mute && e.Player.Group.HasPermission(Permissions.cantalkinthird) && !String.IsNullOrEmpty(Config.ServerActionMessageFormat) && !IsListening(e.Player.User.ID, "transparently"))
-                        SendToListeningChannels(e.Player.User.ID, String.Format(Config.ServerActionMessageFormat, e.Player.Name, e.CommandText.Substring(3), "", "", Main.worldName));
+					if (!e.Player.mute && e.Player.Group.HasPermission(Permissions.cantalkinthird) && !String.IsNullOrEmpty(Config.ServerActionMessageFormat) && !IsListening(e.Player, "transparently"))
+                        SendToListeningChannels(e.Player, String.Format(Config.ServerActionMessageFormat, e.Player.Name, e.CommandText.Substring(3), "", "", Main.worldName));
 				}
 				else if (e.CommandList.Count() == 0 || e.CommandList.First().DoLog)
 				{
@@ -559,7 +531,7 @@ namespace TShockIRC
                 if (player != null && player.User != null)
                 {
                     int uid = player.User.ID;
-                    if (uid != skipuid && IsListening(uid, channel))
+                    if (uid != skipuid && IsListening(player, channel))
                     {
                         player.SendMessage(msg.Replace("#channel",channel), col);
                     }
@@ -572,7 +544,7 @@ namespace TShockIRC
             foreach (TSPlayer player in TShock.Players)
             {
                 int uid = player.User.ID;
-                if (uid != skipuid && IsListening(uid, channel))
+                if (uid != skipuid && IsListening(player, channel))
                 {
                     player.SendMessage(msg.Replace("#channel",channel), red, green, blue);
                 }
