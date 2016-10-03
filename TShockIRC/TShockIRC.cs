@@ -60,7 +60,8 @@ namespace TShockIRC
             Connecting = true;
             IrcUsers.Clear();
             IrcClient = new IrcClient();
-            IrcClient.Connect((String)Config.Server, Config.Port, Config.SSL,
+            //IrcClient.Connect((String)Config.Server, Config.Port, Config.SSL,
+            IrcClient.Connect((String)Config.Server, Config.Port, false,
                 new IrcUserRegistrationInfo()
                 {
                     NickName = Config.Nick,
@@ -320,8 +321,9 @@ namespace TShockIRC
 			IrcUsers.Clear();
 
             IrcClient = new IrcClient();
-			IrcClient.Connect( (String)Config.Server, Config.Port, Config.SSL,
-				new IrcUserRegistrationInfo()
+			//IrcClient.Connect( (String)Config.Server, Config.Port, Config.SSL,
+            IrcClient.Connect((String)Config.Server, Config.Port, false,
+                new IrcUserRegistrationInfo()
 				{
 					NickName = Config.Nick,
 					RealName = Config.RealName,

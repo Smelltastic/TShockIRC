@@ -18,7 +18,7 @@ namespace TShockIRC
 		public short Port = 6667;
 		public string RealName = "TShock";
 		public string Server = "localhost";
-		public bool SSL = false;
+		//public bool SSL = false;
 		public string UserName = "TShock";
         // Discrete password option added. ConnectCommands don't seem to be sufficient because they
         // don't appear to send until after you're authenticated, with PASS auth anyhow.
