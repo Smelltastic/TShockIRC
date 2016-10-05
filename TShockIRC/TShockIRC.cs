@@ -94,6 +94,7 @@ namespace TShockIRC
         }
         public override void Initialize()
         {
+            db.Connect("tshockircplayers", new string[] { "listening", "sending" });
             ServerApi.Hooks.GameInitialize.Register(this, OnInitialize);
             ServerApi.Hooks.GamePostInitialize.Register(this, OnPostInitialize);
             ServerApi.Hooks.NetGreetPlayer.Register(this, OnGreetPlayer);
@@ -172,6 +173,8 @@ namespace TShockIRC
                     {
                         db.SetUserData(player, property, db.GetUserData(player, property) + " " + channel);
                     }
+                    if (property == "sending") // If we've turned on sending, make sure listening is on also.
+                        SetListening(player, channel, true);
                 }
                 else
                 {
@@ -189,15 +192,9 @@ namespace TShockIRC
                         }
                         //return chans.Split(' ').Contains(channel, StringComparer.OrdinalIgnoreCase);
                         db.SetUserData(player, property, chans.Replace(channel, "").Replace("  ", " ").Trim());
-                        if( property == "listening" && !set_to )
-                        {
-                            SetSending(player, channel, false);
-                        }
-                        else if( property == "sending" && set_to )
-                        {
-                            SetListening(player, channel, true);
-                        }
                     }
+                    if( property == "listening" ) // If we've turned off listening, make sure sending is off also.
+                        SetSending(player, channel, false);
                 }
             }
         }
@@ -254,15 +251,13 @@ namespace TShockIRC
 
         void OnInitialize(EventArgs e)
 		{
-			IRCCommands.Initialize();
+            IRCCommands.Initialize();
             Commands.ChatCommands.Add(new Command("tshockirc.listen", IRC, "irc"));
 			//Commands.ChatCommands.Add(new Command("tshockirc.manage", IRCReload, "ircreload"));
 			//Commands.ChatCommands.Add(new Command("tshockirc.manage", IRCRestart, "ircrestart"));
 
 			string configPath = Path.Combine(TShock.SavePath, "tshockircconfig.json");
 			(Config = Config.Read(configPath)).Write(configPath);
-
-            db.Connect("tshockircplayers", new string[]{ "listening", "sending" } );
 		}
 
 		void OnPostInitialize(EventArgs e)
@@ -442,6 +437,7 @@ namespace TShockIRC
                         SendChanInfo(e.Player, (param.Count>=2?param[2]:"") );
                     }
                     break;
+                case "hear":
                 case "listen":
                     if( e.Player.HasPermission("tshockirc.listen") ) {
                         if( param.Count != 2 )
