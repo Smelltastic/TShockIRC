@@ -153,8 +153,11 @@ namespace TShockIRC
             string chans = db.GetUserData(player, property);
             if( chans == null )
             {
-                chans = String.Join(" ", Config.Channels);
-                db.SetUserData(player, new String[] { chans, "" }); // Initialize listening to everything but not sending
+                db.SetUserData(player, new String[] { String.Join(" ", Config.Channels), "" }); // Initialize listening to everything but not sending
+                if (property == "listening")
+                    chans = String.Join(" ", Config.Channels);
+                else
+                    chans = "";
             }
             return chans.Split(' ').Contains(channel, StringComparer.OrdinalIgnoreCase);
         }
@@ -666,7 +669,7 @@ namespace TShockIRC
             }
             else if (Config.Channels.Contains(ircChannel.Name, StringComparer.OrdinalIgnoreCase))
 			{
-                if (e.Text.StartsWith(Config.BotPrefix))
+                if ( (!String.IsNullOrEmpty(Config.BotPrefix)) && e.Text.StartsWith(Config.BotPrefix))
                 {
                     IRCCommands.Execute(e.Text.Substring(Config.BotPrefix.Length), ircUser, (IIrcMessageTarget)sender);
                     return;
